@@ -1,0 +1,52 @@
+apiVersion: v1
+kind: Secret
+metadata:
+  name: user-login-creds
+type: Opaque
+data:
+  username: <base64 encoded username>
+  password: <base64 encoded password>
+
+---
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: login-script
+data:
+  script.sh: |
+    #!/bin/bash
+    # Extract username and password from Secret
+    username=$(echo $USERNAME | base64 -d)
+    password=$(echo $PASSWORD | base64 -d)
+    # Your login script here, using username and password
+
+---
+
+apiVersion: batch/v1beta1
+kind: CronJob
+metadata:
+  name: auto-login
+spec:
+  schedule: "0 * * * *" # Run every hour
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          containers:
+          - name: auto-login
+            image: <your_image_containing_login_script>
+            command: ["/bin/bash", "-c"]
+            args: ["./script.sh"]
+            env:
+            - name: USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: user-login-creds
+                  key: username
+            - name: PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: user-login-creds
+                  key: password
+          restartPolicy: OnFailure
